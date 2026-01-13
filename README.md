@@ -25,4 +25,6 @@ The dashboard app shows key insights and many important metric to Telco manager.
   </table>
 </div> 
 
+This project is available on https://telco-customer-churn-eda.onrender.com/
+
 For this project I used this dataset from Kaggle: https://www.kaggle.com/datasets/blastchar/telco-customer-churn?resource=download
