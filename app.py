@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-
+import plotly.express as px
 
 @st.cache_data
 def load_data():
@@ -15,69 +14,90 @@ st.divider()
 
 st.header("Situación actual de Churn en Telco")
 
+
 col1, col2, col3, col4 = st.columns(4)
 
-total_customers = len(df)
-churn_customers = len(df[df['Churn'] == 'Yes'])
-churn_rate = (churn_customers / total_customers) * 100
-lost_income = df[df['Churn'] == 'Yes']['MonthlyCharges'].sum()
+total_clientes = len(df)
+churn_clientes = len(df[df['Churn'] == 'Yes'])
+churn_rate = (churn_clientes / total_clientes) * 100
+ingresos_perdidos = df[df['Churn'] == 'Yes']['MonthlyCharges'].sum()
 
+col1.metric("Total Clientes", f"{total_clientes:,}")
+col2.metric("Clientes Perdidos", f"{churn_clientes:,}")
+col3.metric("Tasa de Churn", f"{churn_rate:.1f}%")
+col4.metric("Ingresos Mensuales Perdidos", f"${ingresos_perdidos:,.0f}")
 
-col1.metric("Total de Customers", total_customers)
-col2.metric("Customers con Churn", churn_customers)
-col3.metric("Tasa de churn ", f"{churn_rate:.2f}%")
-col4.metric("Lost monthly income ", f"${lost_income:.2f}")
+st.divider()
 
 st.header("Indicadores cruciales de Churn en Customers")
 
-tab1, tab2, tab3 = st.tabs(["Antigüedad", "Cargos Mensuales", "Tipo de Contrato"])
-
-with tab1:
+hist_tenure = st.checkbox('Mostrar distribución de antigüedad')
+if hist_tenure:
     st.subheader("Antigüedad del cliente y su relación con el churn")
     
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.hist(df[df['Churn']=='No']['tenure'], bins=30, alpha=0.6, label='No Churn', color='blue', edgecolor='black')
-    ax.hist(df[df['Churn']=='Yes']['tenure'], bins=30, alpha=0.6, label='Churn', color='skyblue', edgecolor='black')
-    ax.set_xlabel('Meses como cliente')
-    ax.set_ylabel('Frecuencia')
-    ax.legend()
-    st.pyplot(fig)
-
+    df_plot = df.copy()
+    df_plot['Tipo'] = df_plot['Churn'].map({'Yes': 'Se van', 'No': 'Se quedan'})
+    
+    fig = px.histogram(df_plot, x='tenure', color='Tipo', 
+                       nbins=30, 
+                       labels={'tenure': 'Meses como cliente', 'Tipo': ''},
+                       color_discrete_map={'Se van': 'blue', 'Se quedan': 'skyblue'})
+    st.plotly_chart(fig, use_container_width=True)
+    
     col1, col2 = st.columns(2)
     col1.metric("Se quedan", f"{df[df['Churn']=='No']['tenure'].mean():.1f} meses")
     col2.metric("Se van", f"{df[df['Churn']=='Yes']['tenure'].mean():.1f} meses")
 
-with tab2:
+hist_charges = st.checkbox('Mostrar distribución de cargos mensuales')
+if hist_charges:
     st.subheader("Cargos mensuales y su impacto en el abandono")
     
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.hist(df[df['Churn']=='No']['MonthlyCharges'], bins=30, alpha=0.6, label='No Churn', edgecolor='black')
-    ax.hist(df[df['Churn']=='Yes']['MonthlyCharges'], bins=30, alpha=0.6, label='Churn', edgecolor='black')
-    ax.set_xlabel('Cargo Mensual ($)')
-    ax.set_ylabel('Frecuencia')
-    ax.legend()
-    st.pyplot(fig)
+    df_plot = df.copy()
+    df_plot['Tipo'] = df_plot['Churn'].map({'Yes': 'Se van', 'No': 'Se quedan'})
+    
+    fig = px.histogram(df_plot, x='MonthlyCharges', color='Tipo',
+                       nbins=30,
+                       labels={'MonthlyCharges': 'Cargo Mensual ($)', 'Tipo': ''},
+                       color_discrete_map={'Se van': 'blue', 'Se quedan': 'skyblue'})
+    st.plotly_chart(fig, use_container_width=True)
     
     col1, col2 = st.columns(2)
     col1.metric("Se quedan", f"${df[df['Churn']=='No']['MonthlyCharges'].mean():.2f}")
     col2.metric("Se van", f"${df[df['Churn']=='Yes']['MonthlyCharges'].mean():.2f}")
 
-with tab3:
+scatter_button = st.button('Mostrar relación entre antigüedad y cargos')
+if scatter_button:
+    st.subheader("Relación entre antigüedad y cargos mensuales")
+    
+    df_plot = df.copy()
+    df_plot['Tipo'] = df_plot['Churn'].map({'Yes': 'Se van', 'No': 'Se quedan'})
+    
+    fig = px.scatter(df_plot, x='tenure', y='MonthlyCharges', color='Tipo',
+                     labels={'tenure': 'Meses como cliente', 
+                             'MonthlyCharges': 'Cargo Mensual ($)',
+                             'Tipo': ''},
+                     color_discrete_map={'Se van': 'blue', 'Se quedan': 'skyblue'})
+    st.plotly_chart(fig, use_container_width=True)
+
+bar_contract = st.checkbox('Mostrar impacto del tipo de contrato')
+if bar_contract:
     st.subheader("Tipo de contrato como predictor de churn")
     
     churn_by_contract = pd.crosstab(df['Contract'], df['Churn'], normalize='index') * 100
+    churn_by_contract_melted = churn_by_contract.reset_index().melt(id_vars='Contract', 
+                                                                      var_name='Tipo',
+                                                                      value_name='Porcentaje')
     
-    fig, ax = plt.subplots(figsize=(8, 4))
-    churn_by_contract.plot(kind='bar', ax=ax, edgecolor='black')
-    ax.set_xlabel('Tipo de Contrato')
-    ax.set_ylabel('Porcentaje ')
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=0)
-    ax.legend(['No Churn', 'Churn'])
-    st.pyplot(fig)
+    fig = px.bar(churn_by_contract_melted, x='Contract', y='Porcentaje', color='Tipo',
+                 barmode='group',
+                 labels={'Contract': 'Tipo de Contrato', 'Porcentaje': 'Porcentaje (%)'},
+                 color_discrete_map={'Yes': 'blue', 'No': 'skyblue'})
+    st.plotly_chart(fig, use_container_width=True)
     
     st.info("Los contratos Month-to-month tienen 42.7% de churn vs 2.8% de los bianuales")
 
 st.divider()
+
 
 st.header("Segmento de Ultra-Alto Riesgo")
 
